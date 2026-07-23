@@ -27,6 +27,8 @@ async function loadData() {
   const combinedUrl = localStorage.getItem('nuvio_custom_combined_url') || defaultCombinedUrl;
   const flaggedUrl = localStorage.getItem('nuvio_custom_flagged_url') || defaultFlaggedUrl;
 
+  let isDemoData = (combinedUrl === defaultCombinedUrl);
+
   try {
     const resCombined = await fetch(combinedUrl);
     if (resCombined.ok) {
@@ -37,8 +39,17 @@ async function loadData() {
       flaggedItems = await resFlagged.json();
     }
   } catch (e) {
-    // Local file:// protocol fetch fallback
     console.warn("Failed to fetch custom URLs or local fallback:", e);
+    if (!isDemoData) {
+      alert("⚠️ Error loading custom Data Source URLs. Please check console or reset Data Source.");
+    }
+  }
+
+  const demoBanner = document.getElementById('demo-banner');
+  if (isDemoData && allItems.length > 0 && demoBanner) {
+    demoBanner.classList.remove('hidden');
+  } else if (demoBanner) {
+    demoBanner.classList.add('hidden');
   }
 
   updateCounters();
@@ -428,6 +439,18 @@ function applyFilters() {
 function renderGrid() {
   const grid = document.getElementById('media-grid');
   grid.innerHTML = '';
+
+  if (allItems.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: var(--text-muted); border: 2px dashed rgba(255,255,255,0.1); border-radius: var(--radius-lg);">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">📦</div>
+        <h3 style="font-family: 'Outfit', sans-serif;">No media data loaded</h3>
+        <p style="margin-top: 0.5rem;">Drop your export file above or configure a Data Source.</p>
+      </div>
+    `;
+    document.getElementById('pagination-controls').style.display = 'none';
+    return;
+  }
 
   if (filteredItems.length === 0) {
     grid.innerHTML = `

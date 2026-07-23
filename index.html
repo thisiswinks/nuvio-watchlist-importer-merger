@@ -19,6 +19,9 @@
   </div>
 
   <header class="app-header">
+    <div id="demo-banner" class="demo-banner hidden">
+      ⚠️ <strong>Viewing Demo Data (Winks's Watchlist)</strong>. This is a public showcase. To view your own, <a href="#" onclick="document.getElementById('btn-data-source').click(); return false;" style="color: #fff; text-decoration: underline;">configure your Data Source</a> or drop your export file.
+    </div>
     <div class="header-container">
       <div class="logo-group">
         <div class="logo-icon">🎬</div>
@@ -95,7 +98,7 @@
         <button class="tab-btn tab-warning" data-tab="flagged">⚠️ Reconciliation Flagged (<span id="count-flagged">4129</span>)</button>
       </div>
 
-      <div class="filter-toolbar">
+      <div class="filter-toolbar glass-card" style="padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-top: 1rem;">
         <div class="search-box">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" id="search-input" placeholder="Search by title, IMDB, TMDB, TVDB, MAL ID...">
@@ -147,9 +150,9 @@
         <div class="nuvio-guide-box" style="margin-top: 1rem;">
           <div class="step-badge">Step 1: Nuvio Token / cURL</div>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-            Paste your <code>Bearer eyJ...</code> token or your DevTools <code>curl</code> request from Nuvio:
+            Paste your <code aria-label="Nuvio Authorization Token">Bearer eyJ...</code> token or your DevTools <code>curl</code> request from Nuvio:
           </p>
-          <textarea id="nuvio-token-input" rows="4" class="token-textarea" placeholder="Paste your Bearer token (eyJ...) or full curl command from Nuvio network tab here..."></textarea>
+          <input type="password" id="nuvio-token-input" class="select-input" style="width: 100%; font-family: monospace;" placeholder="Paste your Bearer token (eyJ...) or full curl command...">
         </div>
 
         <div class="nuvio-guide-box" style="margin-top: 1rem;">

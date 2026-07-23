@@ -112,6 +112,21 @@ body {
   border-radius: var(--radius-lg);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .blob {
+    animation: none !important;
+  }
+  .media-card:hover {
+    transform: none !important;
+  }
+  .stat-card:hover {
+    transform: none !important;
+  }
+  .btn:active {
+    transform: none !important;
+  }
+}
+
 /* Header */
 .app-header {
   border-bottom: 1px solid var(--card-border);
@@ -120,6 +135,19 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
+}
+
+.demo-banner {
+  background: var(--accent-amber);
+  color: #000;
+  text-align: center;
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.demo-banner.hidden {
+  display: none;
 }
 
 .header-container {
