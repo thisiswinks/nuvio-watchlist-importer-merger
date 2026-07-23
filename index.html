@@ -102,6 +102,9 @@
         </div>
 
         <div class="filter-dropdowns">
+          <button id="btn-data-source" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; margin-right: 0.5rem;">
+            ⚙️ Data Source
+          </button>
           <select id="source-filter" class="select-input">
             <option value="all">All Sources</option>
             <option value="trakt">Trakt</option>
@@ -227,6 +230,33 @@
             </div>
           </a>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Data Source Configuration -->
+  <div id="data-source-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>⚙️ Data Source Configuration</h3>
+        <button id="data-source-modal-close" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.9rem; margin-bottom: 1rem;">Configure the URLs used to load your media data. Leave blank to use the default local exports.</p>
+        
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Combined Data URL:</label>
+          <input type="text" id="input-url-combined" class="select-input" style="width: 100%; padding: 0.5rem;" placeholder="data/export/combined_full.json">
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Flagged Data URL:</label>
+          <input type="text" id="input-url-flagged" class="select-input" style="width: 100%; padding: 0.5rem;" placeholder="data/export/reconciliation_flagged.json">
+        </div>
+
+        <button id="btn-save-data-source" class="btn btn-primary btn-block">
+          Save & Reload
+        </button>
       </div>
     </div>
   </div>

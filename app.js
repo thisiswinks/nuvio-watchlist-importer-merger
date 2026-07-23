@@ -21,17 +21,24 @@ async function loadData() {
     flaggedItems = window.FLAGGED_MEDIA_DATA;
   }
 
+  const defaultCombinedUrl = 'data/export/combined_full.json';
+  const defaultFlaggedUrl = 'data/export/reconciliation_flagged.json';
+
+  const combinedUrl = localStorage.getItem('nuvio_custom_combined_url') || defaultCombinedUrl;
+  const flaggedUrl = localStorage.getItem('nuvio_custom_flagged_url') || defaultFlaggedUrl;
+
   try {
-    const resCombined = await fetch('data/export/combined_full.json');
+    const resCombined = await fetch(combinedUrl);
     if (resCombined.ok) {
       allItems = await resCombined.json();
     }
-    const resFlagged = await fetch('data/export/reconciliation_flagged.json');
+    const resFlagged = await fetch(flaggedUrl);
     if (resFlagged.ok) {
       flaggedItems = await resFlagged.json();
     }
   } catch (e) {
     // Local file:// protocol fetch fallback
+    console.warn("Failed to fetch custom URLs or local fallback:", e);
   }
 
   updateCounters();
@@ -139,6 +146,34 @@ function setupEventListeners() {
   // Direct Sync Watched Items to Nuvio API
   document.getElementById('btn-run-nuvio-sync').addEventListener('click', async () => {
     await runNuvioDirectSync();
+  });
+
+  // Data Source Modal
+  const dsModal = document.getElementById('data-source-modal');
+  const inputCombined = document.getElementById('input-url-combined');
+  const inputFlagged = document.getElementById('input-url-flagged');
+
+  document.getElementById('btn-data-source').addEventListener('click', () => {
+    inputCombined.value = localStorage.getItem('nuvio_custom_combined_url') || '';
+    inputFlagged.value = localStorage.getItem('nuvio_custom_flagged_url') || '';
+    dsModal.classList.remove('hidden');
+  });
+
+  document.getElementById('data-source-modal-close').addEventListener('click', () => {
+    dsModal.classList.add('hidden');
+  });
+
+  document.getElementById('btn-save-data-source').addEventListener('click', () => {
+    const comb = inputCombined.value.trim();
+    const flag = inputFlagged.value.trim();
+    
+    if (comb) localStorage.setItem('nuvio_custom_combined_url', comb);
+    else localStorage.removeItem('nuvio_custom_combined_url');
+    
+    if (flag) localStorage.setItem('nuvio_custom_flagged_url', flag);
+    else localStorage.removeItem('nuvio_custom_flagged_url');
+    
+    window.location.reload();
   });
 }
 
