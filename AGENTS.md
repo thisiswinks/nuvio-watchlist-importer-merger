@@ -1,6 +1,6 @@
 # AGENTS.md - Developer & AI Agent Guidelines
 
-Welcome AI agents and human contributors! This document outlines architectural standards, workflow rules, and skill routing guidelines for contributing to **What I Watched Sync**.
+Welcome AI agents and human contributors! This document outlines architectural standards, workflow rules, and skill routing guidelines for contributing to **nuvio-watchlist-importer-merger**.
 
 ---
 
