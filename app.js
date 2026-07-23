@@ -471,17 +471,26 @@ function renderGrid() {
 
   pageItems.forEach(item => {
     if (currentTab === 'flagged') {
+      const absIndex = flaggedItems.indexOf(item);
       const card = document.createElement('div');
       card.className = 'media-card glass-card';
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
       card.innerHTML = `
         <div class="card-header">
-          <span class="type-badge badge-anime">Flagged Conflict</span>
+          <span class="type-badge badge-anime" style="background: var(--accent-amber); color: #000;">⚠️ Conflict</span>
         </div>
-        <div>
-          <h4 class="media-title">${item.item1_title || 'Item 1'}</h4>
-          <p style="font-size: 0.8rem; color: var(--accent-amber); margin: 0.25rem 0;">vs</p>
-          <h4 class="media-title">${item.item2_title || 'Item 2'}</h4>
-          <p class="media-year">Reason: ${item.reason}</p>
+        <div style="flex-grow: 1;">
+          <h4 class="media-title" style="font-size: 0.95rem;">${escapeHtml(item.item1_title || 'Item 1')}</h4>
+          <p style="font-size: 0.7rem; color: var(--accent-amber); margin: 0.25rem 0; font-weight: bold;">VS</p>
+          <h4 class="media-title" style="font-size: 0.95rem;">${escapeHtml(item.item2_title || 'Item 2')}</h4>
+          <p class="media-year" style="margin-top: 0.5rem; font-size: 0.8rem; line-height: 1.2;">Reason: ${escapeHtml(item.reason)}</p>
+        </div>
+        <div class="reconciliation-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-top: 1rem;">
+          <button class="btn btn-secondary" style="padding: 0.4rem; font-size: 0.75rem;" onclick="handleReconciliation('keep1', ${absIndex})">Keep 1</button>
+          <button class="btn btn-secondary" style="padding: 0.4rem; font-size: 0.75rem;" onclick="handleReconciliation('keep2', ${absIndex})">Keep 2</button>
+          <button class="btn btn-emerald" style="padding: 0.4rem; font-size: 0.75rem;" onclick="handleReconciliation('merge', ${absIndex})">Merge</button>
+          <button class="btn btn-secondary" style="padding: 0.4rem; font-size: 0.75rem; background: rgba(255,255,255,0.05);" onclick="handleReconciliation('skip', ${absIndex})">Skip</button>
         </div>
       `;
       grid.appendChild(card);
@@ -521,3 +530,17 @@ function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+window.handleReconciliation = function(action, index) {
+  const item = flaggedItems[index];
+  console.log(`Reconciliation action: ${action} on item`, item);
+  
+  // For now, regardless of the action chosen, we resolve the conflict by removing it from the flagged list
+  flaggedItems.splice(index, 1);
+  
+  // Re-apply filters and render to update the UI
+  applyFilters();
+  
+  // Update counters to reflect the new flagged count
+  updateCounters();
+};
