@@ -478,11 +478,11 @@ function renderGrid() {
       card.style.flexDirection = 'column';
       card.innerHTML = `
         <div class="card-header">
-          <span class="type-badge badge-anime" style="background: var(--accent-amber); color: #000;">⚠️ Conflict</span>
+          <span class="type-badge badge-anime" style="background: var(--primary-yellow); color: #000;">⚠️ Conflict</span>
         </div>
         <div style="flex-grow: 1;">
           <h4 class="media-title" style="font-size: 0.95rem;">${escapeHtml(item.item1_title || 'Item 1')}</h4>
-          <p style="font-size: 0.7rem; color: var(--accent-amber); margin: 0.25rem 0; font-weight: bold;">VS</p>
+          <p style="font-size: 0.7rem; color: var(--primary-yellow); margin: 0.25rem 0; font-weight: bold;">VS</p>
           <h4 class="media-title" style="font-size: 0.95rem;">${escapeHtml(item.item2_title || 'Item 2')}</h4>
           <p class="media-year" style="margin-top: 0.5rem; font-size: 0.8rem; line-height: 1.2;">Reason: ${escapeHtml(item.reason)}</p>
         </div>
