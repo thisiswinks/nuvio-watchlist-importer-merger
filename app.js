@@ -285,11 +285,11 @@ function setupEventListeners() {
           if (item.media_type === 'anime' && (!item.ids || !item.ids.simkl)) {
             const match = mappings.find(m => {
               if (item.ids) {
-                if (item.ids.mal && m.mal_id === item.ids.mal) return true;
-                if (item.ids.kitsu && m.kitsu_id === item.ids.kitsu) return true;
-                if (item.ids.anilist && m.anilist_id === item.ids.anilist) return true;
-                if (item.ids.imdb && m.imdb_id === item.ids.imdb) return true;
-                if (item.ids.tvdb && m.thetvdb_id === item.ids.tvdb) return true;
+                if (item.ids.mal && String(m.mal_id) === String(item.ids.mal)) return true;
+                if (item.ids.kitsu && String(m.kitsu_id) === String(item.ids.kitsu)) return true;
+                if (item.ids.anilist && String(m.anilist_id) === String(item.ids.anilist)) return true;
+                if (item.ids.imdb && String(m.imdb_id) === String(item.ids.imdb)) return true;
+                if (item.ids.tvdb && String(m.thetvdb_id) === String(item.ids.tvdb)) return true;
               }
               return false;
             });
@@ -525,7 +525,7 @@ async function handleUploadedFiles(files) {
 
   if (newItems.length > 0) {
     dropText.textContent = `Extracted ${newItems.length} raw items. Merging...`;
-    mergeNewItems(newItems);
+    await mergeNewItems(newItems);
     dropText.textContent = `Successfully merged into library! Total items: ${allItems.length}`;
   } else {
     dropText.textContent = `No valid media items found in uploaded files.`;
@@ -639,7 +639,7 @@ function parseJson(content) {
   return items;
 }
 
-function mergeNewItems(newItems) {
+async function mergeNewItems(newItems) {
   newItems.forEach(newItem => {
     let existingItem = null;
     
@@ -675,6 +675,7 @@ function mergeNewItems(newItems) {
     }
   });
   
+  await saveCachedData('combined', allItems);
   updateCounters();
   applyFilters();
 }
