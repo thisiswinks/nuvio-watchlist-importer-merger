@@ -8,10 +8,16 @@ const pageSize = 24;
 const DEFAULT_NUVIO_APIKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgxNTIxMzQ2LCJleHAiOjE5MzkyMDEzNDZ9.tmQaj682pwzehpqlgCDMnySOqiUvpgRbrE43T4VJpDI";
 
 document.addEventListener('DOMContentLoaded', async () => {
+  setupTheme();
   setupEventListeners();
   setupDragAndDrop();
   await loadData();
 });
+
+function setupTheme() {
+  const savedTheme = localStorage.getItem('media_sync_theme') || 'kinetic';
+  document.body.dataset.theme = savedTheme;
+}
 
 // IndexedDB Helpers
 function openDB() {
@@ -171,9 +177,25 @@ function updateCounters() {
   
   const enrichEl = document.getElementById('count-enrich');
   if(enrichEl) enrichEl.textContent = enrichCount;
+  
+  // Update cloned marquee stats
+  document.querySelectorAll('.clone-stat-total').forEach(el => el.textContent = allItems.length.toLocaleString());
+  document.querySelectorAll('.clone-stat-movies').forEach(el => el.textContent = movieCount.toLocaleString());
+  document.querySelectorAll('.clone-stat-shows').forEach(el => el.textContent = showCount.toLocaleString());
+  document.querySelectorAll('.clone-stat-anime').forEach(el => el.textContent = animeCount.toLocaleString());
 }
 
 function setupEventListeners() {
+  const btnThemeToggle = document.getElementById('btn-theme-toggle');
+  if (btnThemeToggle) {
+    btnThemeToggle.addEventListener('click', () => {
+      const current = document.body.dataset.theme;
+      const next = current === 'kinetic' ? 'hand-drawn' : 'kinetic';
+      document.body.dataset.theme = next;
+      localStorage.setItem('media_sync_theme', next);
+    });
+  }
+
   // Tabs
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
