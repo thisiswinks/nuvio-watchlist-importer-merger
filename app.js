@@ -7,10 +7,15 @@ const pageSize = 24;
 
 const DEFAULT_NUVIO_APIKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgxNTIxMzQ2LCJleHAiOjE5MzkyMDEzNDZ9.tmQaj682pwzehpqlgCDMnySOqiUvpgRbrE43T4VJpDI";
 
+const SIMKL_CLIENT_ID = "3de047451b8c6c8c1e53cd04599a45aa7c694f70bc31916683488ce6ba1a93d8";
+const SIMKL_REDIRECT_URI = window.location.origin + window.location.pathname;
+
 document.addEventListener('DOMContentLoaded', async () => {
   setupTheme();
   setupEventListeners();
   setupDragAndDrop();
+  await handleSimklOAuthCallback();
+  checkSimklAuthStatus();
   await loadData();
 });
 
@@ -309,6 +314,50 @@ function setupEventListeners() {
     window.location.reload();
   });
 
+  // Simkl OAuth Modals & Controls
+  const simklModal = document.getElementById('simkl-oauth-modal');
+  const btnSimklOAuthHeader = document.getElementById('btn-simkl-oauth');
+  if (btnSimklOAuthHeader) {
+    btnSimklOAuthHeader.addEventListener('click', () => {
+      simklModal.classList.remove('hidden');
+    });
+  }
+
+  const simklCloseBtn = document.getElementById('simkl-oauth-modal-close');
+  if (simklCloseBtn) {
+    simklCloseBtn.addEventListener('click', () => {
+      simklModal.classList.add('hidden');
+    });
+  }
+
+  const exportGuideModal = document.getElementById('export-guide-modal');
+  const exportGuideCloseBtn = document.getElementById('export-guide-modal-close');
+  if (exportGuideCloseBtn) {
+    exportGuideCloseBtn.addEventListener('click', () => {
+      exportGuideModal.classList.add('hidden');
+    });
+  }
+
+  const btnSimklLogin = document.getElementById('btn-simkl-login');
+  if (btnSimklLogin) {
+    btnSimklLogin.addEventListener('click', () => initiateSimklOAuth());
+  }
+
+  const btnSimklLogout = document.getElementById('btn-simkl-logout');
+  if (btnSimklLogout) {
+    btnSimklLogout.addEventListener('click', () => logoutSimkl());
+  }
+
+  const btnSimklPull = document.getElementById('btn-simkl-pull');
+  if (btnSimklPull) {
+    btnSimklPull.addEventListener('click', () => runSimklPullSync());
+  }
+
+  const btnSimklPush = document.getElementById('btn-simkl-push');
+  if (btnSimklPush) {
+    btnSimklPush.addEventListener('click', () => runSimklPushSync());
+  }
+
   // Global Keyboard / Escape Key Listener for Modals
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -546,6 +595,7 @@ async function handleUploadedFiles(files) {
   dropText.textContent = `Processing ${files.length} file(s)...`;
   
   let newItems = [];
+  let traktFiles = { watched_shows: [], watched_movies: [], ratings_shows: [], ratings_movies: [], ratings_episodes: [], history_shows: [], history_movies: [], generic: [] };
 
   for (let file of files) {
     const lowerName = file.name.toLowerCase();
@@ -556,8 +606,7 @@ async function handleUploadedFiles(files) {
           const entryLower = filename.toLowerCase();
           if (!zipEntry.dir && (entryLower.endsWith('.csv') || entryLower.endsWith('.xml') || entryLower.endsWith('.json'))) {
             const content = await zipEntry.async("string");
-            const parsed = await parseFileContent(filename, content);
-            newItems = newItems.concat(parsed);
+            classifyAndCollectFile(filename, content, traktFiles, newItems);
           }
         }
       } catch (e) {
@@ -565,23 +614,165 @@ async function handleUploadedFiles(files) {
       }
     } else if (lowerName.endsWith('.csv') || lowerName.endsWith('.xml') || lowerName.endsWith('.json')) {
       const content = await file.text();
-      const parsed = await parseFileContent(file.name, content);
-      newItems = newItems.concat(parsed);
+      classifyAndCollectFile(file.name, content, traktFiles, newItems);
     }
   }
 
+  // Process gathered Trakt multi-CSV groups if present
+  const traktCombined = processTraktMultiFileGroup(traktFiles);
+  newItems = newItems.concat(traktCombined);
+
   if (newItems.length > 0) {
-    dropText.textContent = `Extracted ${newItems.length} raw items. Merging...`;
+    dropText.textContent = `Extracted ${newItems.length} media items with episode & rating history. Merging...`;
     await mergeNewItems(newItems);
     dropText.textContent = `Successfully merged into library! Total items: ${allItems.length}`;
   } else {
     dropText.textContent = `No valid media items found in uploaded files.`;
   }
 
-  showToast(`Merged ${newItems.length} items. Ready to sync to Nuvio.`);
+  showToast(`Merged ${newItems.length} items with episode logs & ratings intact.`);
 }
 
-async function parseFileContent(filename, content) {
+function classifyAndCollectFile(filename, content, traktFiles, newItems) {
+  const lower = filename.toLowerCase();
+  if (lower.includes('watched_shows')) {
+    traktFiles.watched_shows.push({ filename, content });
+  } else if (lower.includes('watched_movies')) {
+    traktFiles.watched_movies.push({ filename, content });
+  } else if (lower.includes('ratings_shows') || lower.includes('ratings_show')) {
+    traktFiles.ratings_shows.push({ filename, content });
+  } else if (lower.includes('ratings_movies') || lower.includes('ratings_movie')) {
+    traktFiles.ratings_movies.push({ filename, content });
+  } else if (lower.includes('ratings_episodes') || lower.includes('ratings_episode')) {
+    traktFiles.ratings_episodes.push({ filename, content });
+  } else if (lower.includes('history_shows') || lower.includes('history_show')) {
+    traktFiles.history_shows.push({ filename, content });
+  } else if (lower.includes('history_movies') || lower.includes('history_movie')) {
+    traktFiles.history_movies.push({ filename, content });
+  } else {
+    const parsed = parseFileContent(filename, content);
+    if (parsed && parsed.length > 0) {
+      newItems.push(...parsed);
+    }
+  }
+}
+
+function processTraktMultiFileGroup(traktFiles) {
+  const showMap = new Map();
+
+  // Helper to get or create a show entry
+  function getShow(title, year, ids) {
+    const key = (ids.imdb || ids.tmdb || ids.tvdb || ids.trakt || title).toString().toLowerCase();
+    if (!showMap.has(key)) {
+      showMap.set(key, {
+        title: title,
+        year: year ? parseInt(year) : null,
+        media_type: 'show',
+        sources: { trakt: true },
+        ids: { ...ids },
+        user_rating: null,
+        aggregated_rating: null,
+        episodes: [],
+        history: []
+      });
+    }
+    const show = showMap.get(key);
+    show.ids = { ...show.ids, ...ids };
+    return show;
+  }
+
+  // Parse watched shows CSV
+  traktFiles.watched_shows.forEach(f => {
+    const rows = parseCSVToObjects(f.content);
+    rows.forEach(r => {
+      const title = r.show_title || r.title || r.Show || r.Title;
+      if (!title) return;
+      const ids = { imdb: r.imdb_id, tmdb: r.tmdb_id, tvdb: r.tvdb_id, trakt: r.trakt_id };
+      const show = getShow(title, r.show_year || r.year, ids);
+      const s = parseInt(r.season) || 1;
+      const e = parseInt(r.episode || r.number) || 1;
+      show.episodes.push({ season: s, episode: e, watched_at: r.watched_at || r.last_watched_at });
+    });
+  });
+
+  // Parse history shows CSV
+  traktFiles.history_shows.forEach(f => {
+    const rows = parseCSVToObjects(f.content);
+    rows.forEach(r => {
+      const title = r.show_title || r.title;
+      if (!title) return;
+      const ids = { imdb: r.imdb_id, tmdb: r.tmdb_id, tvdb: r.tvdb_id, trakt: r.trakt_id };
+      const show = getShow(title, r.show_year || r.year, ids);
+      const s = parseInt(r.season) || 1;
+      const e = parseInt(r.episode) || 1;
+      show.episodes.push({ season: s, episode: e, watched_at: r.watched_at });
+    });
+  });
+
+  // Parse show ratings CSV
+  traktFiles.ratings_shows.forEach(f => {
+    const rows = parseCSVToObjects(f.content);
+    rows.forEach(r => {
+      const title = r.title || r.show_title;
+      if (!title) return;
+      const ids = { imdb: r.imdb_id, tmdb: r.tmdb_id, tvdb: r.tvdb_id, trakt: r.trakt_id };
+      const show = getShow(title, r.year || r.show_year, ids);
+      const rating = parseFloat(r.rating || r.user_rating);
+      if (rating > 0) {
+        show.user_rating = rating;
+        show.aggregated_rating = rating;
+      }
+    });
+  });
+
+  const results = Array.from(showMap.values());
+
+  // Parse movie watched CSV
+  traktFiles.watched_movies.forEach(f => {
+    const rows = parseCSVToObjects(f.content);
+    rows.forEach(r => {
+      const title = r.title || r.Movie;
+      if (!title) return;
+      results.push({
+        title: title,
+        year: parseInt(r.year) || null,
+        media_type: 'movie',
+        sources: { trakt: true },
+        ids: { imdb: r.imdb_id, tmdb: r.tmdb_id, trakt: r.trakt_id },
+        watched_at: r.watched_at || r.last_watched_at
+      });
+    });
+  });
+
+  // Parse movie ratings CSV
+  traktFiles.ratings_movies.forEach(f => {
+    const rows = parseCSVToObjects(f.content);
+    rows.forEach(r => {
+      const title = r.title || r.Movie;
+      if (!title) return;
+      const rating = parseFloat(r.rating || r.user_rating);
+      results.push({
+        title: title,
+        year: parseInt(r.year) || null,
+        media_type: 'movie',
+        sources: { trakt: true },
+        ids: { imdb: r.imdb_id, tmdb: r.tmdb_id, trakt: r.trakt_id },
+        user_rating: rating > 0 ? rating : null,
+        aggregated_rating: rating > 0 ? rating : null
+      });
+    });
+  });
+
+  return results;
+}
+
+function parseCSVToObjects(content) {
+  if (typeof Papa === 'undefined') return [];
+  const res = Papa.parse(content, { header: true, skipEmptyLines: true });
+  return res.data || [];
+}
+
+function parseFileContent(filename, content) {
   const lowerName = filename.toLowerCase();
   let parsedItems = [];
   
@@ -605,19 +796,39 @@ function parseSimklCSV(content) {
   const results = Papa.parse(content, { header: true, skipEmptyLines: true });
   return results.data.map(row => {
     let type = 'movie';
-    if (row.Type) {
-      if (row.Type.toLowerCase().includes('anime')) type = 'anime';
-      else if (row.Type.toLowerCase().includes('tv') || row.Type.toLowerCase().includes('show')) type = 'show';
-    }
+    const rawType = strVal(row.Type || row.type || row.Watchlist);
+    if (rawType.includes('anime')) type = 'anime';
+    else if (rawType.includes('tv') || rawType.includes('show') || rawType.includes('series')) type = 'show';
     
+    const userRating = parseRating(row['My Rating'] || row.Rating || row.Score);
+    const lastEpStr = strVal(row.LastEpWatched || row['Watched Episodes'] || row['Last Ep Watched']);
+    const status = parseStatus(row.Watchlist || row.Status);
+
+    let episodes = [];
+    if (lastEpStr) {
+      const epMatch = lastEpStr.match(/S(\d+)E(\d+)/i) || lastEpStr.match(/e(\d+)/i);
+      if (epMatch) {
+        const s = epMatch[2] ? parseInt(epMatch[1]) : 1;
+        const e = epMatch[2] ? parseInt(epMatch[2]) : parseInt(epMatch[1]);
+        episodes.push({ season: s, episode: e, watched_at: row.WatchedDate || row['Watched Date'] });
+      }
+    }
+
     return {
-      title: row.Title,
+      title: row.Title || row.title,
       year: parseInt(row.Year) || null,
       media_type: type,
+      status: status,
+      user_rating: userRating,
+      aggregated_rating: userRating,
+      last_watched_at: row.WatchedDate || row['Watched Date'] || null,
+      episodes: episodes,
       sources: { simkl: true },
       ids: {
-        imdb: row['IMDB ID'] || null,
-        simkl: row['Simkl ID'] || null
+        imdb: row['IMDB ID'] || row.IMDB || null,
+        tmdb: row['TMDB ID'] || row.TMDB || null,
+        tvdb: row['TVDB ID'] || row.TVDB || null,
+        simkl: row['SIMKL_ID'] || row['Simkl ID'] || null
       }
     };
   });
@@ -633,12 +844,33 @@ function parseMalXML(content) {
     const node = animeNodes[i];
     const titleNode = node.getElementsByTagName("series_title")[0];
     const idNode = node.getElementsByTagName("series_animedb_id")[0];
+    const scoreNode = node.getElementsByTagName("my_score")[0];
+    const statusNode = node.getElementsByTagName("my_status")[0];
+    const watchedEpNode = node.getElementsByTagName("my_watched_episodes")[0];
+    const finishDateNode = node.getElementsByTagName("my_finish_date")[0];
     
     if (titleNode && idNode) {
+      const score = parseRating(scoreNode ? scoreNode.textContent : null);
+      const status = parseStatus(statusNode ? statusNode.textContent : null);
+      const epCount = parseInt(watchedEpNode ? watchedEpNode.textContent : 0) || 0;
+      const finishDate = finishDateNode && finishDateNode.textContent !== '0000-00-00' ? finishDateNode.textContent : null;
+
+      let episodes = [];
+      if (epCount > 0) {
+        for (let ep = 1; ep <= Math.min(epCount, 100); ep++) {
+          episodes.push({ season: 1, episode: ep, watched_at: finishDate });
+        }
+      }
+
       items.push({
         title: titleNode.textContent,
         year: null,
         media_type: 'anime',
+        status: status,
+        user_rating: score,
+        aggregated_rating: score,
+        last_watched_at: finishDate,
+        episodes: episodes,
         sources: { mal: true },
         ids: {
           mal: parseInt(idNode.textContent)
@@ -659,11 +891,25 @@ function parseJson(content) {
       if (mediaItem && mediaItem.title) {
         let type = entry.movie ? 'movie' : (entry.show ? 'show' : 'movie');
         if (!entry.movie && !entry.show && entry.type) type = entry.type;
+        const rating = parseRating(entry.rating || entry.user_rating || mediaItem.rating);
+
+        let episodes = [];
+        if (entry.episode) {
+          episodes.push({
+            season: entry.episode.season || 1,
+            episode: entry.episode.number || 1,
+            watched_at: entry.watched_at || entry.last_watched_at
+          });
+        }
         
         items.push({
           title: mediaItem.title,
           year: mediaItem.year,
           media_type: type,
+          user_rating: rating,
+          aggregated_rating: rating,
+          last_watched_at: entry.watched_at || entry.last_watched_at || null,
+          episodes: episodes,
           sources: { trakt: true },
           ids: mediaItem.ids || {}
         });
@@ -671,10 +917,18 @@ function parseJson(content) {
     });
   } else if (data.p_items) {
     data.p_items.forEach(item => {
+      let episodes = [];
+      if (item.season && item.episode) {
+        episodes.push({ season: item.season, episode: item.episode, watched_at: item.watched_at });
+      }
+
       items.push({
         title: item.title,
         year: null,
         media_type: item.content_type === 'series' ? 'show' : 'movie',
+        user_rating: item.user_rating || null,
+        aggregated_rating: item.user_rating || null,
+        episodes: episodes,
         sources: { nuvio: true },
         ids: item.ids || {}
       });
@@ -682,6 +936,27 @@ function parseJson(content) {
   }
   
   return items;
+}
+
+function parseRating(val) {
+  if (val === null || val === undefined || val === '') return null;
+  const num = parseFloat(val);
+  return (num > 0 && num <= 10) ? num : null;
+}
+
+function parseStatus(val) {
+  if (!val) return 'completed';
+  const str = String(val).toLowerCase();
+  if (str.includes('watching') || str === '1') return 'watching';
+  if (str.includes('plan') || str.includes('plantowatch') || str === '6') return 'plan_to_watch';
+  if (str.includes('hold') || str === '3') return 'on_hold';
+  if (str.includes('drop') || str === '4') return 'dropped';
+  return 'completed';
+}
+
+function strVal(val) {
+  if (val === null || val === undefined) return '';
+  return String(val).toLowerCase();
 }
 
 async function mergeNewItems(newItems) {
@@ -704,7 +979,7 @@ async function mergeNewItems(newItems) {
         if (!item.title || item.title.toLowerCase() !== newItem.title.toLowerCase()) return false;
         if (item.media_type !== newItem.media_type) return false;
         if (item.year && newItem.year) return item.year === newItem.year;
-        return true; // Match if titles & media types match and at least one is missing year
+        return true;
       });
     }
     
@@ -715,7 +990,31 @@ async function mergeNewItems(newItems) {
       if (newItem.media_type === 'anime' && existingItem.media_type !== 'anime') {
         existingItem.media_type = 'anime';
       }
+
+      // Merge user rating
+      if (!existingItem.user_rating && newItem.user_rating) {
+        existingItem.user_rating = newItem.user_rating;
+        existingItem.aggregated_rating = newItem.user_rating;
+      } else if (newItem.user_rating && existingItem.user_rating) {
+        existingItem.aggregated_rating = Math.max(existingItem.user_rating, newItem.user_rating);
+      }
+
+      // Merge episode watch history
+      if (newItem.episodes && newItem.episodes.length > 0) {
+        if (!existingItem.episodes) existingItem.episodes = [];
+        newItem.episodes.forEach(newEp => {
+          const exists = existingItem.episodes.some(e => e.season === newEp.season && e.episode === newEp.episode);
+          if (!exists) {
+            existingItem.episodes.push(newEp);
+          }
+        });
+      }
+
+      // Merge status & dates
+      if (!existingItem.status && newItem.status) existingItem.status = newItem.status;
+      if (!existingItem.last_watched_at && newItem.last_watched_at) existingItem.last_watched_at = newItem.last_watched_at;
     } else {
+      if (!newItem.episodes) newItem.episodes = [];
       allItems.push(newItem);
     }
   });
@@ -859,20 +1158,29 @@ function renderGrid() {
       card.className = 'media-card';
       const mtype = escapeHtml(item.media_type || 'movie');
       const badgeClass = (item.media_type || 'movie') === 'anime' ? 'badge-anime' : ((item.media_type || 'movie') === 'show' ? 'badge-show' : 'badge-movie');
-      const ratingText = item.aggregated_rating ? `\u2605 ${escapeHtml(String(item.aggregated_rating))}` : 'Unrated';
+      const ratingText = item.aggregated_rating ? `★ ${escapeHtml(String(item.aggregated_rating))}/10` : (item.user_rating ? `★ ${escapeHtml(String(item.user_rating))}/10` : 'Unrated');
+      const statusText = item.status ? escapeHtml(String(item.status).replace(/_/g, ' ')) : 'completed';
+      const statusClass = `status-${escapeHtml(String(item.status || 'completed').toLowerCase().replace(/ /g, '_'))}`;
       const ids = item.ids || {};
+
+      let epCountText = '';
+      if (item.episodes && item.episodes.length > 0) {
+        epCountText = `<span class="episode-progress">📺 ${item.episodes.length} EP${item.episodes.length > 1 ? 's' : ''} Watched</span>`;
+      }
 
       card.innerHTML = `
         <div>
           <div class="card-header">
             <span class="type-badge ${badgeClass}">${mtype}</span>
-            <span class="rating-tag">${ratingText}</span>
+            <span class="badge-status ${statusClass}">${statusText}</span>
+            <span class="badge-rating">${ratingText}</span>
           </div>
           <h3 class="media-title" style="margin-top: 0.75rem;">${escapeHtml(item.title)}</h3>
           ${item.year ? `<p class="media-year">${item.year}</p>` : ''}
+          ${epCountText}
         </div>
 
-        <div class="id-pills">
+        <div class="id-pills" style="margin-top: 0.75rem;">
           ${ids.imdb ? `<span class="id-pill has-val">IMDB: ${escapeHtml(String(ids.imdb))}</span>` : ''}
           ${ids.tmdb ? `<span class="id-pill has-val">TMDB: ${escapeHtml(String(ids.tmdb))}</span>` : ''}
           ${ids.tvdb ? `<span class="id-pill has-val">TVDB: ${escapeHtml(String(ids.tvdb))}</span>` : ''}
@@ -900,12 +1208,360 @@ window.handleReconciliation = function(action, index) {
   const item = flaggedItems[index];
   console.log(`Reconciliation action: ${action} on item`, item);
   
-  // For now, regardless of the action chosen, we resolve the conflict by removing it from the flagged list
   flaggedItems.splice(index, 1);
-  
-  // Re-apply filters and render to update the UI
   applyFilters();
-  
-  // Update counters to reflect the new flagged count
   updateCounters();
 };
+
+/* ==========================================================================
+   SIMKL PKCE OAUTH & 2-PHASE SYNC ENGINE
+   ========================================================================== */
+
+function generateRandomString(length) {
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let text = '';
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
+
+async function generateCodeChallenge(codeVerifier) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+async function initiateSimklOAuth() {
+  try {
+    const codeVerifier = generateRandomString(64);
+    sessionStorage.setItem('simkl_code_verifier', codeVerifier);
+
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+    const redirectUri = encodeURIComponent(SIMKL_REDIRECT_URI);
+    
+    const authUrl = `https://simkl.com/oauth/authorize?response_type=code&client_id=${SIMKL_CLIENT_ID}&redirect_uri=${redirectUri}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+    
+    showToast("🔑 Redirecting to Simkl for PKCE OAuth...");
+    window.location.href = authUrl;
+  } catch (err) {
+    console.error("Simkl OAuth Error:", err);
+    alert("OAuth Error: " + err.message);
+  }
+}
+
+async function handleSimklOAuthCallback() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  if (!code) return;
+
+  const codeVerifier = sessionStorage.getItem('simkl_code_verifier');
+  if (!codeVerifier) {
+    console.warn("Simkl OAuth callback missing code_verifier");
+    return;
+  }
+
+  showToast("⏳ Exchanging Simkl Authorization Code...");
+
+  try {
+    const response = await fetch('https://api.simkl.org/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code: code,
+        client_id: SIMKL_CLIENT_ID,
+        code_verifier: codeVerifier,
+        redirect_uri: SIMKL_REDIRECT_URI
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Token endpoint HTTP ${response.status}: ${err}`);
+    }
+
+    const data = await response.json();
+    if (data.access_token) {
+      localStorage.setItem('simkl_access_token', data.access_token);
+      sessionStorage.removeItem('simkl_code_verifier');
+      
+      // Clean query parameters from URL cleanly
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+
+      showToast("🎉 Simkl Account Connected via PKCE OAuth!");
+      checkSimklAuthStatus();
+      
+      // Trigger initial pull sync automatically
+      await runSimklPullSync();
+    }
+  } catch (err) {
+    console.error("Simkl Token Exchange Error:", err);
+    showToast("❌ Simkl OAuth Error: " + err.message);
+  }
+}
+
+function checkSimklAuthStatus() {
+  const token = localStorage.getItem('simkl_access_token');
+  const badge = document.getElementById('simkl-status-badge');
+  const desc = document.getElementById('simkl-status-desc');
+  const btnLogin = document.getElementById('btn-simkl-login');
+  const btnLogout = document.getElementById('btn-simkl-logout');
+  const syncOpts = document.getElementById('simkl-sync-options');
+  const headerBtn = document.getElementById('btn-simkl-oauth');
+
+  if (token) {
+    if (badge) {
+      badge.textContent = "Connected ✔";
+      badge.style.background = "#10B981";
+      badge.style.color = "#fff";
+    }
+    if (desc) desc.textContent = "Authenticated with Simkl. Ready to sync history & ratings.";
+    if (btnLogin) btnLogin.classList.add('hidden');
+    if (btnLogout) btnLogout.classList.remove('hidden');
+    if (syncOpts) syncOpts.classList.remove('hidden');
+    if (headerBtn) {
+      headerBtn.innerHTML = "⚡ Simkl Connected ✔";
+      headerBtn.style.background = "#10B981";
+      headerBtn.style.color = "#fff";
+    }
+  } else {
+    if (badge) {
+      badge.textContent = "Not Connected";
+      badge.style.background = "var(--black)";
+      badge.style.color = "var(--white)";
+    }
+    if (desc) desc.textContent = "Authenticate with Simkl via secure 1-click OAuth PKCE.";
+    if (btnLogin) btnLogin.classList.remove('hidden');
+    if (btnLogout) btnLogout.classList.add('hidden');
+    if (syncOpts) syncOpts.classList.add('hidden');
+    if (headerBtn) {
+      headerBtn.innerHTML = "⚡ Connect Simkl (PKCE)";
+      headerBtn.style.background = "var(--primary-yellow)";
+      headerBtn.style.color = "var(--black)";
+    }
+  }
+}
+
+function logoutSimkl() {
+  localStorage.removeItem('simkl_access_token');
+  localStorage.removeItem('simkl_last_activity_date');
+  checkSimklAuthStatus();
+  showToast("Simkl account disconnected.");
+}
+
+async function runSimklPullSync() {
+  const token = localStorage.getItem('simkl_access_token');
+  if (!token) {
+    alert("Please login with Simkl first.");
+    return;
+  }
+
+  const progressContainer = document.getElementById('simkl-sync-progress');
+  const fill = document.getElementById('simkl-progress-fill');
+  const statusText = document.getElementById('simkl-sync-status-text');
+
+  if (progressContainer) progressContainer.classList.remove('hidden');
+
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'simkl-api-key': SIMKL_CLIENT_ID,
+    'Content-Type': 'application/json'
+  };
+
+  const lastActivityDate = localStorage.getItem('simkl_last_activity_date');
+  let pulledItems = [];
+
+  try {
+    if (lastActivityDate) {
+      // Phase 2: Delta Sync
+      statusText.textContent = `Fetching Simkl updates since ${lastActivityDate} (Phase 2 Delta)...`;
+      fill.style.width = "40%";
+
+      const res = await fetch(`https://api.simkl.org/sync/all-items/?date_from=${encodeURIComponent(lastActivityDate)}`, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      pulledItems = processSimklApiResponse(data);
+      fill.style.width = "80%";
+    } else {
+      // Phase 1: Sequential Sync (shows -> movies -> anime)
+      statusText.textContent = "Phase 1 Initial Sync: Fetching Simkl Shows...";
+      fill.style.width = "20%";
+
+      const resShows = await fetch('https://api.simkl.org/sync/shows', { headers });
+      const showsData = resShows.ok ? await resShows.json() : {};
+      await new Promise(r => setTimeout(r, 400)); // Delay between requests per guidelines
+
+      statusText.textContent = "Phase 1 Initial Sync: Fetching Simkl Movies...";
+      fill.style.width = "50%";
+      const resMovies = await fetch('https://api.simkl.org/sync/movies', { headers });
+      const moviesData = resMovies.ok ? await resMovies.json() : {};
+      await new Promise(r => setTimeout(r, 400));
+
+      statusText.textContent = "Phase 1 Initial Sync: Fetching Simkl Anime...";
+      fill.style.width = "80%";
+      const resAnime = await fetch('https://api.simkl.org/sync/anime', { headers });
+      const animeData = resAnime.ok ? await resAnime.json() : {};
+
+      pulledItems = processSimklApiResponse({ shows: showsData.shows || showsData, movies: moviesData.movies || moviesData, anime: animeData.anime || animeData });
+    }
+
+    // Fetch activities to record latest date
+    const resAct = await fetch('https://api.simkl.org/sync/activities', { headers });
+    if (resAct.ok) {
+      const actData = await resAct.json();
+      const latest = actData.all || actData.shows || actData.movies;
+      if (latest) {
+        localStorage.setItem('simkl_last_activity_date', latest);
+      }
+    }
+
+    statusText.textContent = `Merging ${pulledItems.length} items from Simkl API...`;
+    fill.style.width = "95%";
+
+    if (pulledItems.length > 0) {
+      await mergeNewItems(pulledItems);
+    }
+
+    fill.style.width = "100%";
+    statusText.textContent = `🎉 Success! Simkl sync complete (${pulledItems.length} items).`;
+    showToast(`Pulled ${pulledItems.length} items from Simkl API.`);
+  } catch (err) {
+    console.error("Simkl Pull Sync Error:", err);
+    statusText.textContent = "Error: " + err.message;
+    statusText.style.color = "var(--primary-red)";
+  }
+}
+
+function processSimklApiResponse(data) {
+  const items = [];
+
+  function processCategory(list, defaultType) {
+    if (!Array.isArray(list)) return;
+    list.forEach(entry => {
+      const media = entry.show || entry.movie || entry.anime || entry;
+      const title = media.title || media.name;
+      if (!title) return;
+
+      const type = entry.show ? 'show' : (entry.anime ? 'anime' : defaultType);
+      const rating = parseRating(entry.user_rating || entry.rating);
+
+      let episodes = [];
+      if (entry.episodes && Array.isArray(entry.episodes)) {
+        entry.episodes.forEach(ep => {
+          episodes.push({ season: ep.season || 1, episode: ep.number || 1, watched_at: ep.watched_at });
+        });
+      } else if (entry.last_watched_at) {
+        episodes.push({ season: 1, episode: 1, watched_at: entry.last_watched_at });
+      }
+
+      items.push({
+        title: title,
+        year: media.year || null,
+        media_type: type,
+        status: parseStatus(entry.status),
+        user_rating: rating,
+        aggregated_rating: rating,
+        last_watched_at: entry.last_watched_at || null,
+        episodes: episodes,
+        sources: { simkl: true },
+        ids: {
+          simkl: media.ids ? media.ids.simkl : null,
+          imdb: media.ids ? media.ids.imdb : null,
+          tmdb: media.ids ? media.ids.tmdb : null,
+          tvdb: media.ids ? media.ids.tvdb : null,
+          mal: media.ids ? media.ids.mal : null
+        }
+      });
+    });
+  }
+
+  if (data.shows) processCategory(data.shows, 'show');
+  if (data.movies) processCategory(data.movies, 'movie');
+  if (data.anime) processCategory(data.anime, 'anime');
+
+  return items;
+}
+
+async function runSimklPushSync() {
+  const token = localStorage.getItem('simkl_access_token');
+  if (!token) {
+    alert("Please connect your Simkl account first.");
+    return;
+  }
+
+  const progressContainer = document.getElementById('simkl-sync-progress');
+  const fill = document.getElementById('simkl-progress-fill');
+  const statusText = document.getElementById('simkl-sync-status-text');
+
+  if (progressContainer) progressContainer.classList.remove('hidden');
+
+  statusText.textContent = "Formatting library items for Simkl History API...";
+  fill.style.width = "30%";
+
+  const payload = {
+    movies: [],
+    shows: []
+  };
+
+  allItems.forEach(item => {
+    const ids = item.ids || {};
+    const simklIds = {};
+    if (ids.simkl) simklIds.simkl = ids.simkl;
+    if (ids.imdb) simklIds.imdb = ids.imdb;
+    if (ids.tmdb) simklIds.tmdb = ids.tmdb;
+    if (ids.tvdb) simklIds.tvdb = ids.tvdb;
+
+    if (item.media_type === 'movie') {
+      payload.movies.push({
+        title: item.title,
+        year: item.year,
+        ids: simklIds
+      });
+    } else {
+      payload.shows.push({
+        title: item.title,
+        year: item.year,
+        ids: simklIds,
+        seasons: [{ number: 1, episodes: item.episodes ? item.episodes.map(e => ({ number: e.episode })) : [{ number: 1 }] }]
+      });
+    }
+  });
+
+  statusText.textContent = `Pushing ${payload.movies.length} movies and ${payload.shows.length} shows to Simkl...`;
+  fill.style.width = "70%";
+
+  try {
+    const res = await fetch('https://api.simkl.org/sync/history', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'simkl-api-key': SIMKL_CLIENT_ID,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`HTTP ${res.status}: ${err}`);
+    }
+
+    fill.style.width = "100%";
+    statusText.textContent = "🎉 Successfully pushed library to Simkl API!";
+    showToast("Pushed library to Simkl API.");
+  } catch (err) {
+    console.error("Simkl Push Error:", err);
+    statusText.textContent = "Push Error: " + err.message;
+    statusText.style.color = "var(--primary-red)";
+  }
+}
+

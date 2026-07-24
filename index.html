@@ -33,6 +33,9 @@
         <button id="btn-theme-toggle" class="btn btn-secondary">
           🎨 Switch Theme
         </button>
+        <button id="btn-simkl-oauth" class="btn btn-secondary" style="background: var(--primary-yellow); color: var(--black);">
+          ⚡ Connect Simkl (PKCE)
+        </button>
         <button id="btn-quick-nuvio" class="btn btn-action">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
           ⚡ Sync Watched to Nuvio API
@@ -51,8 +54,16 @@
       <div id="drop-zone" class="drop-zone">
         <div class="drop-icon">📦</div>
         <div class="drop-text">
-          <h3>Drop your Trakt ZIP export or MAL XML file here</h3>
-          <p>Or click to select files — instantly generates your deduplicated Nuvio, Simkl, and Trakt sync payloads</p>
+          <h3>Drop your full Trakt ZIP export, Simkl CSV/ZIP, or MAL XML file here</h3>
+          <p>Or click to select files — instantly extracts per-episode history, user ratings, and deduplicates your library</p>
+        </div>
+        <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+          <button id="btn-open-guide" class="btn btn-secondary" onclick="event.stopPropagation(); document.getElementById('export-guide-modal').classList.remove('hidden');" style="font-size: 0.85rem; padding: 0.5rem 1rem;">
+            📖 How to Export Data (Guide)
+          </button>
+          <button id="btn-drop-simkl-oauth" class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('btn-simkl-oauth').click();" style="font-size: 0.85rem; padding: 0.5rem 1rem;">
+            ⚡ Auto-Sync via Simkl PKCE OAuth
+          </button>
         </div>
         <input type="file" id="file-input" accept=".zip,.json,.xml,.csv,.gz" multiple class="file-input-hidden">
       </div>
@@ -297,6 +308,106 @@
         <button id="btn-save-data-source" class="btn btn-primary btn-block">
           Save & Reload
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Simkl PKCE OAuth Sync -->
+  <div id="simkl-oauth-modal" class="modal-overlay hidden">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="simkl-oauth-modal-title" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 id="simkl-oauth-modal-title">⚡ Simkl Automatic Sync (PKCE OAuth)</h3>
+        <button id="simkl-oauth-modal-close" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Connect directly to Simkl using official PKCE OAuth to pull and push your watched history, episode logs, and ratings without manually exporting files!</p>
+        
+        <div id="simkl-auth-status" class="nuvio-guide-box" style="margin-top: 1rem;">
+          <div class="step-badge">Status: <span id="simkl-status-badge">Not Connected</span></div>
+          <p id="simkl-status-desc" style="font-size: 0.85rem; margin-bottom: 1rem;">
+            Authenticate with Simkl via secure 1-click OAuth PKCE.
+          </p>
+          <button id="btn-simkl-login" class="btn btn-action btn-block">
+            🔑 Login with Simkl (PKCE OAuth)
+          </button>
+          <button id="btn-simkl-logout" class="btn btn-secondary btn-block hidden" style="margin-top: 0.5rem;">
+            Disconnect Simkl Account
+          </button>
+        </div>
+
+        <div id="simkl-sync-options" class="nuvio-guide-box hidden" style="margin-top: 1rem;">
+          <div class="step-badge">Sync Controls</div>
+          <p style="font-size: 0.85rem; margin-bottom: 1rem;">
+            <strong>Phase 1 (Initial Sync):</strong> Sequential call to <code>/sync/shows</code>, <code>/sync/movies</code>, and <code>/sync/anime</code>.<br>
+            <strong>Phase 2 (Delta Sync):</strong> Uses saved activity timestamp <code>/sync/all-items/?date_from=...</code>.
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <button id="btn-simkl-pull" class="btn btn-primary btn-block">
+              📥 Pull Watched & Ratings from Simkl
+            </button>
+            <button id="btn-simkl-push" class="btn btn-action btn-block">
+              📤 Push Library History & Ratings to Simkl
+            </button>
+          </div>
+          <div id="simkl-sync-progress" class="sync-progress-container hidden" style="margin-top: 1rem;">
+            <div class="progress-bar-bg">
+              <div id="simkl-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+            <p id="simkl-sync-status-text" style="font-size: 0.85rem; text-align: center; margin-top: 0.5rem;">Ready to sync...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for How to Export Data Guide -->
+  <div id="export-guide-modal" class="modal-overlay hidden">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="export-guide-modal-title" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 id="export-guide-modal-title">📖 How to Export Your Watchlist Data</h3>
+        <button id="export-guide-modal-close" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        <p style="font-size: 0.9rem; margin-bottom: 1rem;">Follow these step-by-step instructions to export your complete watch history, ratings, and episode logs from each platform, then drop the resulting file into this app!</p>
+        
+        <div class="nuvio-guide-box" style="margin-bottom: 1rem;">
+          <div class="step-badge">1. Trakt.tv (Full Export ZIP)</div>
+          <ol style="font-size: 0.85rem; padding-left: 1.25rem; line-height: 1.5;">
+            <li>Log in to <a href="https://trakt.tv" target="_blank" rel="noopener">Trakt.tv</a>.</li>
+            <li>Go to <strong>Settings</strong> &rarr; <strong>Advanced</strong> tab.</li>
+            <li>Scroll down to <strong>Export Data</strong> and click <strong>Export</strong>.</li>
+            <li>Download the generated <code>.zip</code> file (contains <code>watched_shows.csv</code>, <code>watched_movies.csv</code>, <code>ratings_shows.csv</code>, etc.).</li>
+            <li><strong>Drop the entire <code>.zip</code> file directly into our drop zone!</strong></li>
+          </ol>
+        </div>
+
+        <div class="nuvio-guide-box" style="margin-bottom: 1rem;">
+          <div class="step-badge">2. Simkl (CSV / Auto PKCE Sync)</div>
+          <ol style="font-size: 0.85rem; padding-left: 1.25rem; line-height: 1.5;">
+            <li><strong>Option A (Auto Sync):</strong> Click <strong>⚡ Connect Simkl (PKCE)</strong> above for 1-click automatic import/export!</li>
+            <li><strong>Option B (Manual CSV):</strong> Log in to <a href="https://simkl.com/settings/backup/" target="_blank" rel="noopener">Simkl Backup Settings</a>.</li>
+            <li>Click <strong>Export to CSV</strong> to download your <code>SimklBackup.csv</code> file.</li>
+            <li>Drop the <code>.csv</code> file into our drop zone.</li>
+          </ol>
+        </div>
+
+        <div class="nuvio-guide-box" style="margin-bottom: 1rem;">
+          <div class="step-badge">3. MyAnimeList (MAL XML Export)</div>
+          <ol style="font-size: 0.85rem; padding-left: 1.25rem; line-height: 1.5;">
+            <li>Log in to <a href="https://myanimelist.net/panel.php?go=export" target="_blank" rel="noopener">MyAnimeList Panel Export</a>.</li>
+            <li>Click <strong>Export Anime List</strong>.</li>
+            <li>Download the <code>animelist.xml.gz</code> or <code>animelist.xml</code> file.</li>
+            <li>Drop the <code>.xml</code> or <code>.gz</code>/<code>.zip</code> file into our drop zone.</li>
+          </ol>
+        </div>
+
+        <div class="nuvio-guide-box" style="margin-bottom: 1rem;">
+          <div class="step-badge">4. Nuvio TV</div>
+          <ol style="font-size: 0.85rem; padding-left: 1.25rem; line-height: 1.5;">
+            <li>Use <strong>⚡ Sync Watched to Nuvio API</strong> for direct API watched history import!</li>
+            <li>Or drop any previously exported <code>nuvio_watched_sync.json</code> file.</li>
+          </ol>
+        </div>
       </div>
     </div>
   </div>

@@ -40,5 +40,20 @@ class TestMergerPipeline(unittest.TestCase):
         os.remove("test.csv")
         os.remove("test_output.json")
 
+    def test_trakt_csv_parser(self):
+        with open("test_trakt.csv", "w", encoding="utf-8") as f:
+            f.write("show_title,show_year,season,episode,rating,watched_at,imdb_id,tmdb_id,tvdb_id,trakt_id\n")
+            f.write("Breaking Bad,2008,1,1,10,2023-10-12T09:03:45Z,tt0903747,1396,81189,1\n")
+
+        parser = CSVParser("test_trakt.csv")
+        results = parser.parse_trakt()
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "Breaking Bad")
+        self.assertEqual(results[0]["season"], "1")
+        self.assertEqual(results[0]["episode"], "1")
+        self.assertEqual(results[0]["rating"], "10")
+        os.remove("test_trakt.csv")
+
 if __name__ == "__main__":
     unittest.main()
+

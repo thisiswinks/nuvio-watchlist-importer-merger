@@ -748,3 +748,38 @@ h1, h2, h3, h4, h5, h6 {
 .trakt-bg { background: var(--primary-blue); color: var(--white); }
 .mal-bg { background: var(--primary-yellow); color: var(--black); }
 .nuvio-bg { background: var(--black); color: var(--white); }
+
+/* Rating & Episode Badges */
+.badge-rating {
+  background: var(--accent);
+  color: #000;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border: 2px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.badge-status {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border: 2px solid var(--border-color);
+  text-transform: uppercase;
+}
+.status-completed { background: #10B981; color: #fff; }
+.status-watching { background: #3B82F6; color: #fff; }
+.status-plan_to_watch { background: #8B5CF6; color: #fff; }
+.status-on_hold { background: #F59E0B; color: #000; }
+.status-dropped { background: #EF4444; color: #fff; }
+
+.episode-progress {
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--white);
+  color: var(--black);
+  padding: 0.2rem 0.5rem;
+  border: 2px solid var(--border-color);
+  display: inline-block;
+  margin-top: 0.25rem;
+}
+
