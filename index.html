@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDFuGLRcnTalkgIe6cKgPn2Yf1cFg5Q4B9FdCELSRQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" integrity="sha512-dfX5uYVXzyU8+KHqj8bkHKm6JMbCA5ezb3dRQ+eEKGSQKOhN5fJYksvTlT5eUOMBO46idjynMf0Q8GmAYeHFg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dark-theme">
@@ -30,7 +30,7 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="btn-quick-nuvio" class="btn btn-emerald">
+        <button id="btn-quick-nuvio" class="btn btn-action">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
           ⚡ Sync Watched to Nuvio API
         </button>
@@ -51,7 +51,7 @@
           <h3>Drop your Trakt ZIP export or MAL XML file here</h3>
           <p>Or click to select files — instantly generates your deduplicated Nuvio, Simkl, and Trakt sync payloads</p>
         </div>
-        <input type="file" id="file-input" accept=".zip,.json,.xml,.gz" class="file-input-hidden">
+        <input type="file" id="file-input" accept=".zip,.json,.xml,.csv,.gz" multiple class="file-input-hidden">
       </div>
     </section>
 
@@ -60,28 +60,28 @@
       <div class="stat-card">
         <div class="stat-icon icon-purple">📊</div>
         <div class="stat-info">
-          <span class="stat-value" id="stat-total">971</span>
+          <span class="stat-value" id="stat-total">—</span>
           <span class="stat-label">Total Unique Items</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-blue">🍿</div>
         <div class="stat-info">
-          <span class="stat-value" id="stat-movies">468</span>
+          <span class="stat-value" id="stat-movies">—</span>
           <span class="stat-label">Movies</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-teal">📺</div>
         <div class="stat-info">
-          <span class="stat-value" id="stat-shows">221</span>
+          <span class="stat-value" id="stat-shows">—</span>
           <span class="stat-label">TV Shows</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-pink">🌸</div>
         <div class="stat-info">
-          <span class="stat-value" id="stat-anime">282</span>
+          <span class="stat-value" id="stat-anime">—</span>
           <span class="stat-label">Anime (Otaku Mapped)</span>
         </div>
       </div>
@@ -90,11 +90,11 @@
     <!-- Navigation Tabs & Toolbar -->
     <section class="control-panel">
       <div class="tab-buttons">
-        <button class="tab-btn active" data-tab="all">All Items (<span id="count-all">971</span>)</button>
-        <button class="tab-btn" data-tab="anime">🌸 Anime (<span id="count-anime">282</span>)</button>
-        <button class="tab-btn" data-tab="movies">🍿 Movies (<span id="count-movies">468</span>)</button>
-        <button class="tab-btn" data-tab="shows">📺 TV Shows (<span id="count-shows">221</span>)</button>
-        <button class="tab-btn tab-warning" data-tab="flagged">⚠️ Reconciliation Flagged (<span id="count-flagged">4129</span>)</button>
+        <button class="tab-btn active" data-tab="all">All Items (<span id="count-all">0</span>)</button>
+        <button class="tab-btn" data-tab="anime">🌸 Anime (<span id="count-anime">0</span>)</button>
+        <button class="tab-btn" data-tab="movies">🍿 Movies (<span id="count-movies">0</span>)</button>
+        <button class="tab-btn" data-tab="shows">📺 TV Shows (<span id="count-shows">0</span>)</button>
+        <button class="tab-btn tab-warning" data-tab="flagged">⚠️ Flagged (<span id="count-flagged">0</span>)</button>
         <button class="tab-btn" data-tab="enrich" style="background: var(--primary-yellow); color: var(--black);">✨ Enrichment (<span id="count-enrich">0</span>)</button>
       </div>
 
@@ -142,9 +142,9 @@
 
   <!-- Modal for 1-Click Direct Nuvio Watched API Importer -->
   <div id="nuvio-modal" class="modal-overlay hidden">
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="nuvio-modal-title" style="max-width: 600px;">
       <div class="modal-header">
-        <h3>⚡ Direct Nuvio Watched API Importer</h3>
+        <h3 id="nuvio-modal-title">⚡ Direct Nuvio Watched API Importer</h3>
         <button id="nuvio-modal-close" class="close-btn">&times;</button>
       </div>
       <div class="modal-body">
@@ -175,7 +175,7 @@
         </div>
 
         <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
-          <button id="btn-run-nuvio-sync" class="btn btn-emerald btn-block">
+          <button id="btn-run-nuvio-sync" class="btn btn-action btn-block">
             🚀 Direct Sync Watched Items to Nuvio API
           </button>
           <button id="btn-copy-nuvio-json" class="btn btn-secondary btn-block">
@@ -192,9 +192,9 @@
 
   <!-- Modal for Service Import Exports -->
   <div id="export-modal" class="modal-overlay hidden">
-    <div class="modal-content">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
       <div class="modal-header">
-        <h3>Download Service-Native Import Payloads</h3>
+        <h3 id="export-modal-title">Download Service-Native Import Payloads</h3>
         <button id="modal-close" class="close-btn">&times;</button>
       </div>
       <div class="modal-body">
@@ -242,21 +242,21 @@
 
   <!-- Modal for Data Source Configuration -->
   <div id="data-source-modal" class="modal-overlay hidden">
-    <div class="modal-content" style="max-width: 500px;">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="data-source-modal-title" style="max-width: 500px;">
       <div class="modal-header">
-        <h3>⚙️ Data Source Configuration</h3>
+        <h3 id="data-source-modal-title">⚙️ Data Source Configuration</h3>
         <button id="data-source-modal-close" class="close-btn">&times;</button>
       </div>
       <div class="modal-body">
         <p style="font-size: 0.9rem; margin-bottom: 1rem;">Configure the URLs used to load your media data. Leave blank to use the default local exports.</p>
         
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Combined Data URL:</label>
+          <label for="input-url-combined" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Combined Data URL:</label>
           <input type="text" id="input-url-combined" class="select-input" style="width: 100%; padding: 0.5rem;" placeholder="data/export/combined_full.json">
         </div>
         
         <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Flagged Data URL:</label>
+          <label for="input-url-flagged" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem;">Flagged Data URL:</label>
           <input type="text" id="input-url-flagged" class="select-input" style="width: 100%; padding: 0.5rem;" placeholder="data/export/reconciliation_flagged.json">
         </div>
 

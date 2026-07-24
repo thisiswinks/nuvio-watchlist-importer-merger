@@ -62,9 +62,27 @@ async function saveCachedData(key, data) {
 function showToast(message) {
   const container = document.getElementById('toast-container');
   if (!container) return;
+
+  // Limit max visible toasts to 3
+  const existing = container.querySelectorAll('.toast');
+  if (existing.length >= 3) {
+    existing[0].remove();
+  }
+
   const toast = document.createElement('div');
   toast.className = 'toast';
   toast.textContent = message;
+
+  const dismiss = document.createElement('button');
+  dismiss.className = 'toast-dismiss';
+  dismiss.textContent = '\u00d7';
+  dismiss.setAttribute('aria-label', 'Dismiss notification');
+  dismiss.addEventListener('click', () => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  });
+  toast.appendChild(dismiss);
+
   container.appendChild(toast);
   
   // Trigger reflow
@@ -225,8 +243,8 @@ function setupEventListeners() {
       await navigator.clipboard.writeText(jsonStr);
       const btn = document.getElementById('btn-copy-nuvio-json');
       const origText = btn.innerHTML;
-      btn.innerHTML = '✅ Copied p_items JSON to Clipboard!';
-      btn.style.background = '#059669';
+      btn.innerHTML = '&#10004; Copied p_items JSON to Clipboard!';
+      btn.style.background = 'var(--primary-blue)';
       setTimeout(() => {
         btn.innerHTML = origText;
         btn.style.background = '';
@@ -422,7 +440,7 @@ async function runNuvioDirectSync() {
   const syncStatusText = document.getElementById('sync-status-text');
 
   progressContainer.classList.remove('hidden');
-  syncStatusText.style.color = "#10b981";
+  syncStatusText.style.color = 'var(--primary-blue)';
 
   const btnSync = document.getElementById('btn-run-nuvio-sync');
   btnSync.disabled = true;
@@ -464,7 +482,7 @@ async function runNuvioDirectSync() {
     progressBarFill.style.width = "100%";
   } catch (err) {
     console.error("Nuvio API Sync Error:", err);
-    syncStatusText.style.color = "#f43f5e";
+    syncStatusText.style.color = 'var(--primary-red)';
     syncStatusText.textContent = `Sync Error: ${err.message}`;
   } finally {
     btnSync.disabled = false;
@@ -538,9 +556,7 @@ async function handleUploadedFiles(files) {
     dropText.textContent = `No valid media items found in uploaded files.`;
   }
 
-  setTimeout(() => {
-    document.getElementById('nuvio-modal').classList.remove('hidden');
-  }, 1500);
+  showToast(`Merged ${newItems.length} items. Ready to sync to Nuvio.`);
 }
 
 async function parseFileContent(filename, content) {
@@ -725,7 +741,7 @@ function applyFilters() {
     });
   } else {
     filteredItems = allItems.filter(item => {
-      if (currentTab !== 'all' && item.media_type !== currentTab) {
+      if (currentTab !== 'all' && item.media_type !== currentTab.replace(/s$/, '')) {
         return false;
       }
 
@@ -804,14 +820,14 @@ function renderGrid() {
         </div>
         <div style="flex-grow: 1;">
           <h4 class="media-title" style="font-size: 0.95rem;">${escapeHtml(item.item1_title || 'Item 1')}</h4>
-          <p style="font-size: 0.7rem; color: var(--primary-yellow); margin: 0.25rem 0; font-weight: bold;">VS</p>
+          <p style="font-size: 0.7rem; background: var(--black); color: var(--primary-yellow); margin: 0.25rem 0; font-weight: bold; display: inline-block; padding: 0.1rem 0.5rem;">VS</p>
           <h4 class="media-title" style="font-size: 0.95rem;">${escapeHtml(item.item2_title || 'Item 2')}</h4>
           <p class="media-year" style="margin-top: 0.5rem; font-size: 0.8rem; line-height: 1.2;">Reason: ${escapeHtml(item.reason)}</p>
         </div>
         <div class="reconciliation-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-top: 1rem;">
           <button class="btn btn-secondary" style="padding: 0.4rem; font-size: 0.75rem;" onclick="handleReconciliation('keep1', ${absIndex})">Keep 1</button>
           <button class="btn btn-secondary" style="padding: 0.4rem; font-size: 0.75rem;" onclick="handleReconciliation('keep2', ${absIndex})">Keep 2</button>
-          <button class="btn btn-emerald" style="padding: 0.4rem; font-size: 0.75rem;" onclick="handleReconciliation('merge', ${absIndex})">Merge</button>
+          <button class="btn btn-action" style="padding: 0.4rem; font-size: 0.75rem;" onclick="handleReconciliation('merge', ${absIndex})">Merge</button>
           <button class="btn btn-secondary" style="padding: 0.4rem; font-size: 0.75rem; background: rgba(255,255,255,0.05);" onclick="handleReconciliation('skip', ${absIndex})">Skip</button>
         </div>
       `;
@@ -819,9 +835,9 @@ function renderGrid() {
     } else {
       const card = document.createElement('div');
       card.className = 'media-card';
-      const mtype = item.media_type || 'movie';
-      const badgeClass = mtype === 'anime' ? 'badge-anime' : (mtype === 'show' ? 'badge-show' : 'badge-movie');
-      const ratingText = item.aggregated_rating ? `★ ${item.aggregated_rating}` : 'Unrated';
+      const mtype = escapeHtml(item.media_type || 'movie');
+      const badgeClass = (item.media_type || 'movie') === 'anime' ? 'badge-anime' : ((item.media_type || 'movie') === 'show' ? 'badge-show' : 'badge-movie');
+      const ratingText = item.aggregated_rating ? `\u2605 ${escapeHtml(String(item.aggregated_rating))}` : 'Unrated';
       const ids = item.ids || {};
 
       card.innerHTML = `
