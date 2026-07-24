@@ -11,3 +11,5 @@ Plan: `docs/superpowers/plans/2026-07-22-media-dedup-pipeline.md`
 - [x] Task 7: Entrypoint & Integration (commits c1a7835)
 Task 1: complete (commits e4e2a45..ee1cdf2, review clean)
 Task 2: complete (commits ee1cdf2..4c9e279, review clean)
+Task 3: complete (commits 4c9e279..1920092, review clean)
+Task 4: complete (commits 4c9e279..1920092, review clean)
