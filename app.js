@@ -371,11 +371,13 @@ async function handleUploadedFiles(files) {
   let newItems = [];
 
   for (let file of files) {
-    if (file.name.endsWith('.zip')) {
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith('.zip')) {
       try {
         const zip = await JSZip.loadAsync(file);
         for (const [filename, zipEntry] of Object.entries(zip.files)) {
-          if (!zipEntry.dir) {
+          const entryLower = filename.toLowerCase();
+          if (!zipEntry.dir && (entryLower.endsWith('.csv') || entryLower.endsWith('.xml') || entryLower.endsWith('.json'))) {
             const content = await zipEntry.async("string");
             const parsed = await parseFileContent(filename, content);
             newItems = newItems.concat(parsed);
@@ -384,7 +386,7 @@ async function handleUploadedFiles(files) {
       } catch (e) {
         console.error("ZIP parsing error", e);
       }
-    } else {
+    } else if (lowerName.endsWith('.csv') || lowerName.endsWith('.xml') || lowerName.endsWith('.json')) {
       const content = await file.text();
       const parsed = await parseFileContent(file.name, content);
       newItems = newItems.concat(parsed);
@@ -523,10 +525,12 @@ function mergeNewItems(newItems) {
     }
     
     if (!existingItem && newItem.title) {
-      existingItem = allItems.find(item => 
-        item.title && item.title.toLowerCase() === newItem.title.toLowerCase() && 
-        (item.year === newItem.year || !item.year || !newItem.year)
-      );
+      existingItem = allItems.find(item => {
+        if (!item.title || item.title.toLowerCase() !== newItem.title.toLowerCase()) return false;
+        if (item.media_type !== newItem.media_type) return false;
+        if (item.year && newItem.year) return item.year === newItem.year;
+        return true; // Match if titles & media types match and at least one is missing year
+      });
     }
     
     if (existingItem) {
