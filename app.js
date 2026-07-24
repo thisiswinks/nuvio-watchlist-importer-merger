@@ -473,7 +473,7 @@ function renderGrid() {
     if (currentTab === 'flagged') {
       const absIndex = flaggedItems.indexOf(item);
       const card = document.createElement('div');
-      card.className = 'media-card glass-card';
+      card.className = 'media-card';
       card.style.display = 'flex';
       card.style.flexDirection = 'column';
       card.innerHTML = `
@@ -496,7 +496,7 @@ function renderGrid() {
       grid.appendChild(card);
     } else {
       const card = document.createElement('div');
-      card.className = 'media-card glass-card';
+      card.className = 'media-card';
       const mtype = item.media_type || 'movie';
       const badgeClass = mtype === 'anime' ? 'badge-anime' : (mtype === 'show' ? 'badge-show' : 'badge-movie');
       const ratingText = item.aggregated_rating ? `★ ${item.aggregated_rating}` : 'Unrated';

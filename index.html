@@ -12,21 +12,19 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dark-theme">
-  <div class="background-blobs">
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
-  </div>
+  <div class="geo-shape geo-circle"></div>
+  <div class="geo-shape geo-square"></div>
+  <div class="geo-shape geo-triangle"></div>
 
-  <header class="app-header">
+  <header class="app-header bg-[#1040C0]">
     <div id="demo-banner" class="demo-banner hidden">
-      ⚠️ <strong>Viewing Demo Data (Winks's Watchlist)</strong>. This is a public showcase. To view your own, <a href="#" onclick="document.getElementById('btn-data-source').click(); return false;" style="color: #fff; text-decoration: underline;">configure your Data Source</a> or drop your export file.
+      ⚠️ <strong>Viewing Demo Data (Winks's Watchlist)</strong>. This is a public showcase. To view your own, <a href="#" onclick="document.getElementById('btn-data-source').click(); return false;" style="color: var(--black); text-decoration: underline;">configure your Data Source</a> or drop your export file.
     </div>
-    <div class="header-container">
+    <div class="header-container max-w-7xl">
       <div class="logo-group">
         <div class="logo-icon">🎬</div>
         <div>
-          <h1>MediaSync & Nuvio Hub</h1>
+          <h1 class="text-6xl">MediaSync & Nuvio Hub</h1>
           <p class="tagline">Trakt • Simkl • MyAnimeList • Nuvio • Otaku Mappings</p>
         </div>
       </div>
@@ -43,9 +41,9 @@
     </div>
   </header>
 
-  <main class="main-content">
+  <main class="main-content max-w-7xl">
     <!-- Drag & Drop Zone for Ease of Use -->
-    <section class="drop-zone-container glass-card">
+    <section class="drop-zone-container">
       <div id="drop-zone" class="drop-zone">
         <div class="drop-icon">📦</div>
         <div class="drop-text">
@@ -58,28 +56,28 @@
 
     <!-- Stat Counter Grid -->
     <section class="stats-grid">
-      <div class="stat-card glass-card">
+      <div class="stat-card">
         <div class="stat-icon icon-purple">📊</div>
         <div class="stat-info">
           <span class="stat-value" id="stat-total">971</span>
           <span class="stat-label">Total Unique Items</span>
         </div>
       </div>
-      <div class="stat-card glass-card">
+      <div class="stat-card">
         <div class="stat-icon icon-blue">🍿</div>
         <div class="stat-info">
           <span class="stat-value" id="stat-movies">468</span>
           <span class="stat-label">Movies</span>
         </div>
       </div>
-      <div class="stat-card glass-card">
+      <div class="stat-card">
         <div class="stat-icon icon-teal">📺</div>
         <div class="stat-info">
           <span class="stat-value" id="stat-shows">221</span>
           <span class="stat-label">TV Shows</span>
         </div>
       </div>
-      <div class="stat-card glass-card">
+      <div class="stat-card">
         <div class="stat-icon icon-pink">🌸</div>
         <div class="stat-info">
           <span class="stat-value" id="stat-anime">282</span>
@@ -89,7 +87,7 @@
     </section>
 
     <!-- Navigation Tabs & Toolbar -->
-    <section class="control-panel glass-card">
+    <section class="control-panel">
       <div class="tab-buttons">
         <button class="tab-btn active" data-tab="all">All Items (<span id="count-all">971</span>)</button>
         <button class="tab-btn" data-tab="anime">🌸 Anime (<span id="count-anime">282</span>)</button>
@@ -98,7 +96,7 @@
         <button class="tab-btn tab-warning" data-tab="flagged">⚠️ Reconciliation Flagged (<span id="count-flagged">4129</span>)</button>
       </div>
 
-      <div class="filter-toolbar glass-card" style="padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-top: 1rem;">
+      <div class="filter-toolbar">
         <div class="search-box">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" id="search-input" placeholder="Search by title, IMDB, TMDB, TVDB, MAL ID...">
@@ -139,7 +137,7 @@
 
   <!-- Modal for 1-Click Direct Nuvio Watched API Importer -->
   <div id="nuvio-modal" class="modal-overlay hidden">
-    <div class="modal-content glass-card" style="max-width: 600px;">
+    <div class="modal-content" style="max-width: 600px;">
       <div class="modal-header">
         <h3>⚡ Direct Nuvio Watched API Importer</h3>
         <button id="nuvio-modal-close" class="close-btn">&times;</button>
@@ -189,7 +187,7 @@
 
   <!-- Modal for Service Import Exports -->
   <div id="export-modal" class="modal-overlay hidden">
-    <div class="modal-content glass-card">
+    <div class="modal-content">
       <div class="modal-header">
         <h3>Download Service-Native Import Payloads</h3>
         <button id="modal-close" class="close-btn">&times;</button>
@@ -239,7 +237,7 @@
 
   <!-- Modal for Data Source Configuration -->
   <div id="data-source-modal" class="modal-overlay hidden">
-    <div class="modal-content glass-card" style="max-width: 500px;">
+    <div class="modal-content" style="max-width: 500px;">
       <div class="modal-header">
         <h3>⚙️ Data Source Configuration</h3>
         <button id="data-source-modal-close" class="close-btn">&times;</button>
