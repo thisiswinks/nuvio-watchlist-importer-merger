@@ -269,6 +269,13 @@ function setupEventListeners() {
     window.location.reload();
   });
 
+  // Global Keyboard / Escape Key Listener for Modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay').forEach(modal => modal.classList.add('hidden'));
+    }
+  });
+
   const btnEnrich = document.getElementById('btn-trigger-enrich');
   if (btnEnrich) {
     btnEnrich.addEventListener('click', async () => {
@@ -828,12 +835,12 @@ function renderGrid() {
         </div>
 
         <div class="id-pills">
-          ${ids.imdb ? `<span class="id-pill has-val">IMDB: ${ids.imdb}</span>` : ''}
-          ${ids.tmdb ? `<span class="id-pill has-val">TMDB: ${ids.tmdb}</span>` : ''}
-          ${ids.tvdb ? `<span class="id-pill has-val">TVDB: ${ids.tvdb}</span>` : ''}
-          ${ids.mal ? `<span class="id-pill has-val">MAL: ${ids.mal}</span>` : ''}
-          ${ids.kitsu ? `<span class="id-pill has-val">Kitsu: ${ids.kitsu}</span>` : ''}
-          ${ids.simkl ? `<span class="id-pill has-val">Simkl: ${ids.simkl}</span>` : ''}
+          ${ids.imdb ? `<span class="id-pill has-val">IMDB: ${escapeHtml(String(ids.imdb))}</span>` : ''}
+          ${ids.tmdb ? `<span class="id-pill has-val">TMDB: ${escapeHtml(String(ids.tmdb))}</span>` : ''}
+          ${ids.tvdb ? `<span class="id-pill has-val">TVDB: ${escapeHtml(String(ids.tvdb))}</span>` : ''}
+          ${ids.mal ? `<span class="id-pill has-val">MAL: ${escapeHtml(String(ids.mal))}</span>` : ''}
+          ${ids.kitsu ? `<span class="id-pill has-val">Kitsu: ${escapeHtml(String(ids.kitsu))}</span>` : ''}
+          ${ids.simkl ? `<span class="id-pill has-val">Simkl: ${escapeHtml(String(ids.simkl))}</span>` : ''}
         </div>
       `;
       grid.appendChild(card);
@@ -842,8 +849,13 @@ function renderGrid() {
 }
 
 function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 window.handleReconciliation = function(action, index) {
