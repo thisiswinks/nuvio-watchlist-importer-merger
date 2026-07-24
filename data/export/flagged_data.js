@@ -1,0 +1,1 @@
+window.FLAGGED_MEDIA_DATA = window.FLAGGED_MEDIA_DATA || [];

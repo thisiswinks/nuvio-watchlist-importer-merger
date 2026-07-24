@@ -1,0 +1,1 @@
+window.COMBINED_MEDIA_DATA = window.COMBINED_MEDIA_DATA || [];

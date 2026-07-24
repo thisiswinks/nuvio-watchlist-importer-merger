@@ -1268,7 +1268,7 @@ async function handleSimklOAuthCallback() {
   showToast("⏳ Exchanging Simkl Authorization Code...");
 
   try {
-    const response = await fetch('https://api.simkl.org/oauth/token', {
+    const response = await fetch('https://api.simkl.com/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1385,7 +1385,7 @@ async function runSimklPullSync() {
       statusText.textContent = `Fetching Simkl updates since ${lastActivityDate} (Phase 2 Delta)...`;
       fill.style.width = "40%";
 
-      const res = await fetch(`https://api.simkl.org/sync/all-items/?date_from=${encodeURIComponent(lastActivityDate)}`, { headers });
+      const res = await fetch(`https://api.simkl.com/sync/all-items/?date_from=${encodeURIComponent(lastActivityDate)}`, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -1396,26 +1396,26 @@ async function runSimklPullSync() {
       statusText.textContent = "Phase 1 Initial Sync: Fetching Simkl Shows...";
       fill.style.width = "20%";
 
-      const resShows = await fetch('https://api.simkl.org/sync/shows', { headers });
+      const resShows = await fetch('https://api.simkl.com/sync/shows', { headers });
       const showsData = resShows.ok ? await resShows.json() : {};
       await new Promise(r => setTimeout(r, 400)); // Delay between requests per guidelines
 
       statusText.textContent = "Phase 1 Initial Sync: Fetching Simkl Movies...";
       fill.style.width = "50%";
-      const resMovies = await fetch('https://api.simkl.org/sync/movies', { headers });
+      const resMovies = await fetch('https://api.simkl.com/sync/movies', { headers });
       const moviesData = resMovies.ok ? await resMovies.json() : {};
       await new Promise(r => setTimeout(r, 400));
 
       statusText.textContent = "Phase 1 Initial Sync: Fetching Simkl Anime...";
       fill.style.width = "80%";
-      const resAnime = await fetch('https://api.simkl.org/sync/anime', { headers });
+      const resAnime = await fetch('https://api.simkl.com/sync/anime', { headers });
       const animeData = resAnime.ok ? await resAnime.json() : {};
 
       pulledItems = processSimklApiResponse({ shows: showsData.shows || showsData, movies: moviesData.movies || moviesData, anime: animeData.anime || animeData });
     }
 
     // Fetch activities to record latest date
-    const resAct = await fetch('https://api.simkl.org/sync/activities', { headers });
+    const resAct = await fetch('https://api.simkl.com/sync/activities', { headers });
     if (resAct.ok) {
       const actData = await resAct.json();
       const latest = actData.all || actData.shows || actData.movies;
@@ -1540,7 +1540,7 @@ async function runSimklPushSync() {
   fill.style.width = "70%";
 
   try {
-    const res = await fetch('https://api.simkl.org/sync/history', {
+    const res = await fetch('https://api.simkl.com/sync/history', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
