@@ -9,3 +9,4 @@ Plan: `docs/superpowers/plans/2026-07-22-media-dedup-pipeline.md`
 - [x] Task 5: Deduplication & Reconciliation Engine (commits 56772c9)
 - [x] Task 6: Exporters (Master, Service Payloads, Reconciliation) (commits f1cc271)
 - [x] Task 7: Entrypoint & Integration (commits c1a7835)
+Task 1: complete (commits e4e2a45..ee1cdf2, review clean)

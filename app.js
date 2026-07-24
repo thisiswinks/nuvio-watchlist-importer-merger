@@ -367,25 +367,182 @@ function setupDragAndDrop() {
 async function handleUploadedFiles(files) {
   const dropText = document.querySelector('.drop-text h3');
   dropText.textContent = `Processing ${files.length} file(s)...`;
+  
+  let newItems = [];
 
   for (let file of files) {
     if (file.name.endsWith('.zip')) {
       try {
         const zip = await JSZip.loadAsync(file);
-        let count = 0;
-        zip.forEach(() => count++);
-        dropText.textContent = `Extracted ${count} files from ${file.name}! Ready to sync to Nuvio API below.`;
+        for (const [filename, zipEntry] of Object.entries(zip.files)) {
+          if (!zipEntry.dir) {
+            const content = await zipEntry.async("string");
+            const parsed = await parseFileContent(filename, content);
+            newItems = newItems.concat(parsed);
+          }
+        }
       } catch (e) {
-        dropText.textContent = `Uploaded ${file.name}.`;
+        console.error("ZIP parsing error", e);
       }
     } else {
-      dropText.textContent = `Uploaded ${file.name}. Processing library...`;
+      const content = await file.text();
+      const parsed = await parseFileContent(file.name, content);
+      newItems = newItems.concat(parsed);
     }
+  }
+
+  if (newItems.length > 0) {
+    dropText.textContent = `Extracted ${newItems.length} raw items. Merging...`;
+    mergeNewItems(newItems);
+    dropText.textContent = `Successfully merged into library! Total items: ${allItems.length}`;
+  } else {
+    dropText.textContent = `No valid media items found in uploaded files.`;
   }
 
   setTimeout(() => {
     document.getElementById('nuvio-modal').classList.remove('hidden');
-  }, 800);
+  }, 1500);
+}
+
+async function parseFileContent(filename, content) {
+  const lowerName = filename.toLowerCase();
+  let parsedItems = [];
+  
+  try {
+    if (lowerName.endsWith('.csv')) {
+      parsedItems = parseSimklCSV(content);
+    } else if (lowerName.endsWith('.xml')) {
+      parsedItems = parseMalXML(content);
+    } else if (lowerName.endsWith('.json')) {
+      parsedItems = parseJson(content);
+    }
+  } catch(e) {
+    console.error(`Error parsing ${filename}:`, e);
+  }
+  
+  return parsedItems;
+}
+
+function parseSimklCSV(content) {
+  if (typeof Papa === 'undefined') return [];
+  const results = Papa.parse(content, { header: true, skipEmptyLines: true });
+  return results.data.map(row => {
+    let type = 'movie';
+    if (row.Type) {
+      if (row.Type.toLowerCase().includes('anime')) type = 'anime';
+      else if (row.Type.toLowerCase().includes('tv') || row.Type.toLowerCase().includes('show')) type = 'show';
+    }
+    
+    return {
+      title: row.Title,
+      year: parseInt(row.Year) || null,
+      media_type: type,
+      sources: { simkl: true },
+      ids: {
+        imdb: row['IMDB ID'] || null,
+        simkl: row['Simkl ID'] || null
+      }
+    };
+  });
+}
+
+function parseMalXML(content) {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(content, "text/xml");
+  const animeNodes = xmlDoc.getElementsByTagName("anime");
+  const items = [];
+  
+  for (let i = 0; i < animeNodes.length; i++) {
+    const node = animeNodes[i];
+    const titleNode = node.getElementsByTagName("series_title")[0];
+    const idNode = node.getElementsByTagName("series_animedb_id")[0];
+    
+    if (titleNode && idNode) {
+      items.push({
+        title: titleNode.textContent,
+        year: null,
+        media_type: 'anime',
+        sources: { mal: true },
+        ids: {
+          mal: parseInt(idNode.textContent)
+        }
+      });
+    }
+  }
+  return items;
+}
+
+function parseJson(content) {
+  const data = JSON.parse(content);
+  const items = [];
+  
+  if (Array.isArray(data)) {
+    data.forEach(entry => {
+      let mediaItem = entry.movie || entry.show || entry;
+      if (mediaItem && mediaItem.title) {
+        let type = entry.movie ? 'movie' : (entry.show ? 'show' : 'movie');
+        if (!entry.movie && !entry.show && entry.type) type = entry.type;
+        
+        items.push({
+          title: mediaItem.title,
+          year: mediaItem.year,
+          media_type: type,
+          sources: { trakt: true },
+          ids: mediaItem.ids || {}
+        });
+      }
+    });
+  } else if (data.p_items) {
+    data.p_items.forEach(item => {
+      items.push({
+        title: item.title,
+        year: null,
+        media_type: item.content_type === 'series' ? 'show' : 'movie',
+        sources: { nuvio: true },
+        ids: item.ids || {}
+      });
+    });
+  }
+  
+  return items;
+}
+
+function mergeNewItems(newItems) {
+  newItems.forEach(newItem => {
+    let existingItem = null;
+    
+    for (const item of allItems) {
+      const matchFound = ['imdb', 'tmdb', 'tvdb', 'mal', 'simkl', 'trakt'].some(idType => {
+        return newItem.ids && newItem.ids[idType] && item.ids && item.ids[idType] && 
+               String(newItem.ids[idType]) === String(item.ids[idType]);
+      });
+      if (matchFound) {
+        existingItem = item;
+        break;
+      }
+    }
+    
+    if (!existingItem && newItem.title) {
+      existingItem = allItems.find(item => 
+        item.title && item.title.toLowerCase() === newItem.title.toLowerCase() && 
+        (item.year === newItem.year || !item.year || !newItem.year)
+      );
+    }
+    
+    if (existingItem) {
+      existingItem.sources = { ...existingItem.sources, ...newItem.sources };
+      existingItem.ids = { ...newItem.ids, ...existingItem.ids };
+      if (!existingItem.year && newItem.year) existingItem.year = newItem.year;
+      if (newItem.media_type === 'anime' && existingItem.media_type !== 'anime') {
+        existingItem.media_type = 'anime';
+      }
+    } else {
+      allItems.push(newItem);
+    }
+  });
+  
+  updateCounters();
+  applyFilters();
 }
 
 function applyFilters() {
