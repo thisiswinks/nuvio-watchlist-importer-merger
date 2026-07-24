@@ -463,7 +463,32 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   margin-bottom: 1.5rem;
   border-bottom: var(--border-thick);
-  padding-bottom: 1rem;
+  padding-bottom: 2rem;
+}
+
+/* Toast Notification */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.toast {
+  background: var(--black);
+  color: var(--white);
+  padding: 15px 20px;
+  border: 4px solid var(--primary-yellow);
+  box-shadow: 4px 4px 0px 0px var(--black);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  transform: translateX(120%);
+  transition: transform 0.3s ease-in-out;
+}
+.toast.show {
+  transform: translateX(0);
 }
 
 .close-btn {

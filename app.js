@@ -13,6 +13,70 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadData();
 });
 
+// IndexedDB Helpers
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('MediaSyncDB', 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('mediaData')) {
+        db.createObjectStore('mediaData');
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function getCachedData(key) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['mediaData'], 'readonly');
+      const store = transaction.objectStore('mediaData');
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.warn('IndexedDB read failed:', e);
+    return null;
+  }
+}
+
+async function saveCachedData(key, data) {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['mediaData'], 'readwrite');
+      const store = transaction.objectStore('mediaData');
+      const request = store.put(data, key);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.warn('IndexedDB write failed:', e);
+  }
+}
+
+function showToast(message) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  container.appendChild(toast);
+  
+  // Trigger reflow
+  toast.offsetHeight;
+  toast.classList.add('show');
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
 async function loadData() {
   if (window.COMBINED_MEDIA_DATA && Array.isArray(window.COMBINED_MEDIA_DATA)) {
     allItems = window.COMBINED_MEDIA_DATA;
@@ -30,13 +94,27 @@ async function loadData() {
   let isDemoData = (combinedUrl === defaultCombinedUrl);
 
   try {
-    const resCombined = await fetch(combinedUrl);
-    if (resCombined.ok) {
-      allItems = await resCombined.json();
+    const cachedCombined = await getCachedData('combined');
+    const cachedFlagged = await getCachedData('flagged');
+    if (cachedCombined && cachedCombined.length > 0) {
+      allItems = cachedCombined;
+      console.log('Loaded combined data from IndexedDB cache');
+    } else {
+      const resCombined = await fetch(combinedUrl);
+      if (resCombined.ok) {
+        allItems = await resCombined.json();
+        await saveCachedData('combined', allItems);
+      }
     }
-    const resFlagged = await fetch(flaggedUrl);
-    if (resFlagged.ok) {
-      flaggedItems = await resFlagged.json();
+    
+    if (cachedFlagged && cachedFlagged.length > 0) {
+      flaggedItems = cachedFlagged;
+    } else {
+      const resFlagged = await fetch(flaggedUrl);
+      if (resFlagged.ok) {
+        flaggedItems = await resFlagged.json();
+        await saveCachedData('flagged', flaggedItems);
+      }
     }
   } catch (e) {
     console.warn("Failed to fetch custom URLs or local fallback:", e);
@@ -58,6 +136,7 @@ async function loadData() {
 
 function updateCounters() {
   const animeCount = allItems.filter(i => i.media_type === 'anime').length;
+  const enrichCount = allItems.filter(i => i.media_type === 'anime' && (!i.ids || !i.ids.simkl)).length;
   const movieCount = allItems.filter(i => i.media_type === 'movie').length;
   const showCount = allItems.filter(i => i.media_type === 'show').length;
 
@@ -71,6 +150,9 @@ function updateCounters() {
   document.getElementById('count-movies').textContent = movieCount;
   document.getElementById('count-shows').textContent = showCount;
   document.getElementById('count-flagged').textContent = flaggedItems.length;
+  
+  const enrichEl = document.getElementById('count-enrich');
+  if(enrichEl) enrichEl.textContent = enrichCount;
 }
 
 function setupEventListeners() {
@@ -186,6 +268,54 @@ function setupEventListeners() {
     
     window.location.reload();
   });
+
+  const btnEnrich = document.getElementById('btn-trigger-enrich');
+  if (btnEnrich) {
+    btnEnrich.addEventListener('click', async () => {
+      btnEnrich.disabled = true;
+      btnEnrich.textContent = "⏳ Fetching Otaku Mappings...";
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json');
+        if (!response.ok) throw new Error('Failed to fetch anime mappings');
+        const mappings = await response.json();
+        
+        let enrichCount = 0;
+        
+        allItems.forEach(item => {
+          if (item.media_type === 'anime' && (!item.ids || !item.ids.simkl)) {
+            const match = mappings.find(m => {
+              if (item.ids) {
+                if (item.ids.mal && m.mal_id === item.ids.mal) return true;
+                if (item.ids.kitsu && m.kitsu_id === item.ids.kitsu) return true;
+                if (item.ids.anilist && m.anilist_id === item.ids.anilist) return true;
+                if (item.ids.imdb && m.imdb_id === item.ids.imdb) return true;
+                if (item.ids.tvdb && m.thetvdb_id === item.ids.tvdb) return true;
+              }
+              return false;
+            });
+            
+            if (match && match.simkl_id) {
+              if (!item.ids) item.ids = {};
+              item.ids.simkl = match.simkl_id;
+              item.sources = { ...item.sources, simkl: true };
+              enrichCount++;
+            }
+          }
+        });
+        
+        await saveCachedData('combined', allItems);
+        updateCounters();
+        applyFilters();
+        showToast(`✨ Successfully enriched ${enrichCount} anime items with Simkl mappings!`);
+      } catch (err) {
+        console.error('Enrichment error:', err);
+        showToast('❌ Error running anime enrichment. Check console.');
+      } finally {
+        btnEnrich.disabled = false;
+        btnEnrich.textContent = "✨ Run Anime Enrichment";
+      }
+    });
+  }
 }
 
 function parseNuvioAuth(inputStr) {
@@ -555,12 +685,35 @@ function applyFilters() {
   const sourceFilter = document.getElementById('source-filter').value;
   const sortFilter = document.getElementById('sort-filter').value;
 
+  const btnEnrich = document.getElementById('btn-trigger-enrich');
+  if (btnEnrich) {
+    if (currentTab === 'enrich') {
+      btnEnrich.classList.remove('hidden');
+    } else {
+      btnEnrich.classList.add('hidden');
+    }
+  }
+
   if (currentTab === 'flagged') {
     filteredItems = flaggedItems.filter(f => {
       if (!search) return true;
       const t1 = (f.item1_title || '').toLowerCase();
       const t2 = (f.item2_title || '').toLowerCase();
       return t1.includes(search) || t2.includes(search);
+    });
+  } else if (currentTab === 'enrich') {
+    filteredItems = allItems.filter(item => {
+      if (item.media_type !== 'anime') return false;
+      if (item.ids && item.ids.simkl) return false;
+      
+      if (sourceFilter !== 'all' && !item.sources[sourceFilter]) return false;
+      if (search) {
+        const titleMatch = (item.title || '').toLowerCase().includes(search) || (item.title_original || '').toLowerCase().includes(search);
+        const ids = item.ids || {};
+        const idMatch = Object.values(ids).some(val => val && String(val).toLowerCase().includes(search));
+        if (!titleMatch && !idMatch) return false;
+      }
+      return true;
     });
   } else {
     filteredItems = allItems.filter(item => {
